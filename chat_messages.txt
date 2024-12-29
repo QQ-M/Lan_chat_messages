@@ -1,0 +1,22 @@
+[
+  {
+    "username": "QQMan",
+    "message": "你好啊",
+    "timestamp": "13:52:55"
+  },
+  {
+    "username": "QQMan",
+    "message": "我是你的谁",
+    "timestamp": "13:53:23"
+  },
+  {
+    "username": "email@mqqs.eu.org",
+    "message": "什么东西",
+    "timestamp": "13:53:38"
+  },
+  {
+    "username": "email@mqqs.eu.org",
+    "message": "卧槽",
+    "timestamp": "13:53:44"
+  }
+]

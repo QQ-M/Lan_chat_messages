@@ -3,9 +3,51 @@ import socketserver
 import json
 from urllib.parse import parse_qs
 from datetime import datetime
+import os
 
-# 存储聊天消息
-messages = []
+# 配置
+CONFIG = {
+    'MAX_MESSAGES': 100,  # 最大消息数量
+    'STORAGE_FILE': 'chat_messages.txt',  # 存储文件名
+    'PORT': 8000  # 服务器端口
+}
+
+class MessageManager:
+    def __init__(self):
+        self.messages = []
+        self.load_messages()
+
+    def load_messages(self):
+        """从文件加载消息"""
+        try:
+            if os.path.exists(CONFIG['STORAGE_FILE']):
+                with open(CONFIG['STORAGE_FILE'], 'r', encoding='utf-8') as f:
+                    self.messages = json.loads(f.read())
+        except Exception as e:
+            print(f"加载消息出错: {e}")
+            self.messages = []
+
+    def save_messages(self):
+        """保存消息到文件"""
+        try:
+            with open(CONFIG['STORAGE_FILE'], 'w', encoding='utf-8') as f:
+                json.dump(self.messages, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存消息出错: {e}")
+
+    def add_message(self, message):
+        """添加新消息"""
+        self.messages.append(message)
+        if len(self.messages) > CONFIG['MAX_MESSAGES']:
+            self.messages.pop(0)
+        self.save_messages()
+
+    def get_messages(self):
+        """获取所有消息"""
+        return self.messages
+
+# 创建消息管理器实例
+message_manager = MessageManager()
 
 class ChatHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -36,10 +78,16 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                         color: #666;
                         font-size: 0.8em;
                     }
+                    .system-info {
+                        color: #888;
+                        font-size: 0.9em;
+                        margin-bottom: 10px;
+                    }
                 </style>
             </head>
             <body>
                 <h1>局域网聊天室</h1>
+                <div class="system-info">最多显示最近 """ + str(CONFIG['MAX_MESSAGES']) + """ 条消息</div>
                 <div id="messages"></div>
                 <input type="text" id="username" placeholder="你的名字" style="margin-right: 10px;">
                 <input type="text" id="message" placeholder="输入消息">
@@ -94,6 +142,9 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                             sendMessage();
                         }
                     });
+
+                    // 页面加载时获取消息
+                    fetchMessages();
                 </script>
             </body>
             </html>
@@ -105,7 +156,7 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps(messages).encode())
+            self.wfile.write(json.dumps(message_manager.get_messages()).encode())
 
     def do_POST(self):
         if self.path == '/send':
@@ -116,21 +167,22 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
             
             # 添加时间戳
             data['timestamp'] = datetime.now().strftime('%H:%M:%S')
-            messages.append(data)
-            
-            # 只保留最近的100条消息
-            if len(messages) > 100:
-                messages.pop(0)
+            message_manager.add_message(data)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({'status': 'success'}).encode())
 
-def run_server(port=8000):
+def run_server(port=None):
+    if port is not None:
+        CONFIG['PORT'] = port
+    
     handler = ChatHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        print(f"服务器运行在 http://localhost:{port}/")
+    with socketserver.TCPServer(("", CONFIG['PORT']), handler) as httpd:
+        print(f"服务器运行在 http://localhost:{CONFIG['PORT']}/")
+        print(f"消息将保存在: {os.path.abspath(CONFIG['STORAGE_FILE'])}")
+        print(f"最多保存最近 {CONFIG['MAX_MESSAGES']} 条消息")
         httpd.serve_forever()
 
 if __name__ == '__main__':
