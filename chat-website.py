@@ -46,149 +46,403 @@ class MessageManager:
         """获取所有消息"""
         return self.messages
 
-# 创建消息管理器实例
 message_manager = MessageManager()
 
 class ChatHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
-            # 返回主页
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             
             html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>局域网聊天室</title>
-                <meta charset="utf-8">
-                <style>
-                    /* ... 之前的样式保持不变 ... */
-                    
-                    /* 添加隐藏文本框的样式 */
-                    .hidden-textarea {
-                        position: fixed;
-                        top: -9999px;
-                        left: -9999px;
-                        opacity: 0;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>局域网聊天室</h1>
-                <div class="system-info">最多显示最近 """ + str(CONFIG['MAX_MESSAGES']) + """ 条消息</div>
-                <div id="messages"></div>
-                <input type="text" id="username" placeholder="你的名字" style="margin-right: 10px;">
-                <input type="text" id="message" placeholder="输入消息">
-                <button onclick="sendMessage()">发送</button>
-                
-                <!-- 添加用于复制的隐藏文本框 -->
-                <textarea id="copyTextarea" class="hidden-textarea"></textarea>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <title>局域网聊天室</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f5f5;
+            --border-color: #e0e0e0;
+            --success-color: #4caf50;
+            --text-primary: #333;
+            --text-secondary: #666;
+        }
 
-                <script>
-                    function copyMessage(message, button) {
-                        // 首先尝试使用 Clipboard API
-                        if (navigator.clipboard && window.isSecureContext) {
-                            navigator.clipboard.writeText(message)
-                                .then(() => showCopySuccess(button))
-                                .catch(() => fallbackCopy(message, button));
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: #f9f9f9;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .system-info {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            padding: 8px;
+            background: var(--secondary-color);
+            border-radius: 6px;
+        }
+
+        #messages {
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: white;
+        }
+
+        .message {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-content {
+            flex-grow: 1;
+            background: var(--secondary-color);
+            padding: 12px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .timestamp {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .username {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .message-text {
+            word-break: break-word;
+        }
+
+        .copy-btn {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
+        }
+
+        .copy-btn:hover {
+            background: var(--secondary-color);
+            transform: translateY(-1px);
+        }
+
+        .copy-btn.copied {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 12px;
+        }
+
+        input {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        #username {
+            width: 150px;
+        }
+
+        #message {
+            flex-grow: 1;
+        }
+
+        button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: #357abd;
+            transform: translateY(-1px);
+        }
+
+        .hidden-textarea {
+            position: fixed;
+            top: -9999px;
+            left: -9999px;
+            opacity: 0;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 16px;
+            }
+
+            .input-area {
+                flex-direction: column;
+            }
+
+            #username {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>局域网聊天室</h1>
+        <div class="system-info">最多显示最近 """ + str(CONFIG['MAX_MESSAGES']) + """ 条消息</div>
+        <div id="messages"></div>
+        <div class="input-area">
+            <input type="text" id="username" placeholder="你的名字" autocomplete="off">
+            <input type="text" id="message" placeholder="输入消息" autocomplete="off">
+            <button onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+    <textarea id="copyTextarea" class="hidden-textarea"></textarea>
+
+    <script>
+        function copyMessage(message, button) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(message)
+                    .then(() => showCopySuccess(button))
+                    .catch(() => fallbackCopy(message, button));
+            } else {
+                fallbackCopy(message, button);
+            }
+        }
+
+        function fallbackCopy(message, button) {
+            const textarea = document.getElementById('copyTextarea');
+            textarea.value = message;
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                showCopySuccess(button);
+            } catch (err) {
+                console.error('复制失败:', err);
+                button.textContent = '复制失败';
+                button.style.background = '#ffcccc';
+                setTimeout(() => {
+                    button.textContent = '复制';
+                    button.style.background = '';
+                }, 1000);
+            }
+        }
+
+        function showCopySuccess(button) {
+            button.textContent = '已复制';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.textContent = '复制';
+                button.classList.remove('copied');
+            }, 1000);
+        }
+
+        function createMessageElement(msg) {
+            return `
+                <div class="message">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="timestamp">${msg.timestamp}</span>
+                            <span class="username">${msg.username}</span>
+                        </div>
+                        <div class="message-text">${msg.message}</div>
+                    </div>
+                    <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
+                </div>
+            `;
+        }
+
+        function sendMessage() {
+            const username = document.getElementById('username').value.trim();
+            const message = document.getElementById('message').value.trim();
+            
+            if (!username || !message) {
+                alert('请输入用户名和消息！');
+                return;
+            }
+
+            const messageInput = document.getElementById('message');
+            messageInput.disabled = true;
+
+            fetch('/send', {
+                method: 'POST',
+                body: JSON.stringify({ username, message })
+            }).then(() => {
+                messageInput.value = '';
+                messageInput.disabled = false;
+                messageInput.focus();
+                fetchMessages();
+            }).catch(() => {
+                messageInput.disabled = false;
+            });
+        }
+        function fetchMessages() {
+            fetch('/messages')
+                .then(response => response.json())
+                .then(data => {
+                    const messagesDiv = document.getElementById('messages');
+                    const wasAtBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 10;
+                    
+                    // 获取现有消息的数量
+                    const existingMessages = messagesDiv.children;
+                    const currentLength = existingMessages.length;
+                    
+                    // 如果消息数量或内容有变化才更新
+                    if (currentLength !== data.length || needsUpdate(existingMessages, data)) {
+                        // 记住当前滚动位置
+                        const oldScrollHeight = messagesDiv.scrollHeight;
+                        const oldScrollTop = messagesDiv.scrollTop;
+                        
+                        // 更新消息
+                        messagesDiv.innerHTML = data.map(createMessageElement).join('');
+                        
+                        // 恢复滚动位置
+                        if (wasAtBottom) {
+                            messagesDiv.scrollTop = messagesDiv.scrollHeight;
                         } else {
-                            // 如果 Clipboard API 不可用，使用后备方案
-                            fallbackCopy(message, button);
+                            const newScrollHeight = messagesDiv.scrollHeight;
+                            const scrollDiff = newScrollHeight - oldScrollHeight;
+                            messagesDiv.scrollTop = oldScrollTop + scrollDiff;
                         }
                     }
+                });
+        }
 
-                    function fallbackCopy(message, button) {
-                        const textarea = document.getElementById('copyTextarea');
-                        textarea.value = message;
-                        textarea.select();
-                        
-                        try {
-                            document.execCommand('copy');
-                            showCopySuccess(button);
-                        } catch (err) {
-                            console.error('复制失败:', err);
-                            button.textContent = '复制失败';
-                            button.style.background = '#ffcccc';
-                            setTimeout(() => {
-                                button.textContent = '复制';
-                                button.style.background = '#f0f0f0';
-                            }, 1000);
-                        }
-                    }
+        // 检查消息是否需要更新
+        function needsUpdate(existingMessages, newData) {
+            if (existingMessages.length !== newData.length) return true;
+            
+            for (let i = 0; i < existingMessages.length; i++) {
+                const existingMsg = existingMessages[i];
+                const newMsg = newData[i];
+                
+                // 获取现有消息的内容
+                const existingTimestamp = existingMsg.querySelector('.timestamp').textContent;
+                const existingUsername = existingMsg.querySelector('.username').textContent;
+                const existingText = existingMsg.querySelector('.message-text').textContent;
+                
+                // 比较消息内容
+                if (existingTimestamp !== newMsg.timestamp ||
+                    existingUsername !== newMsg.username ||
+                    existingText !== newMsg.message) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-                    function showCopySuccess(button) {
-                        button.textContent = '已复制';
-                        button.classList.add('copied');
-                        setTimeout(() => {
-                            button.textContent = '复制';
-                            button.classList.remove('copied');
-                        }, 1000);
-                    }
+        // 创建消息元素的函数保持不变
+        function createMessageElement(msg) {
+            return `
+                <div class="message">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="timestamp">${msg.timestamp}</span>
+                            <span class="username">${msg.username}</span>
+                        </div>
+                        <div class="message-text">${msg.message}</div>
+                    </div>
+                    <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
+                </div>
+            `;
+        }
 
-                    function fetchMessages() {
-                        fetch('/messages')
-                            .then(response => response.json())
-                            .then(data => {
-                                const messagesDiv = document.getElementById('messages');
-                                messagesDiv.innerHTML = '';
-                                data.forEach(msg => {
-                                    messagesDiv.innerHTML += `
-                                        <div class="message">
-                                            <div class="message-content">
-                                                <span class="timestamp">${msg.timestamp}</span>
-                                                <strong>${msg.username}:</strong> ${msg.message}
-                                            </div>
-                                            <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
-                                        </div>
-                                    `;
-                                });
-                                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                            });
-                    }
+        // 修改轮询间隔为更长时间
+        const pollInterval = 2000; // 2秒
+        let lastPollTime = Date.now();
+        
+        function pollMessages() {
+            const now = Date.now();
+            // 如果距离上次更新不到 pollInterval，跳过这次更新
+            if (now - lastPollTime < pollInterval) {
+                return;
+            }
+            lastPollTime = now;
+            fetchMessages();
+        }
 
-                    function sendMessage() {
-                        const username = document.getElementById('username').value;
-                        const message = document.getElementById('message').value;
-                        
-                        if (!username || !message) {
-                            alert('请输入用户名和消息！');
-                            return;
-                        }
+        // 初始化
+        fetchMessages();
+        setInterval(pollMessages, 300); // 使用更短的检查间隔，但实际更新遵循 pollInterval
 
-                        fetch('/send', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                username: username,
-                                message: message
-                            })
-                        }).then(() => {
-                            document.getElementById('message').value = '';
-                            fetchMessages();
-                        });
-                    }
-
-                    // 每秒更新消息
-                    setInterval(fetchMessages, 1000);
-                    
-                    // 回车发送消息
-                    document.getElementById('message').addEventListener('keypress', function(e) {
-                        if (e.key === 'Enter') {
-                            sendMessage();
-                        }
-                    });
-
-                    // 页面加载时获取消息
-                    fetchMessages();
-                </script>
-            </body>
-            </html>
+    </script>
+</body>
+</html>
             """
             self.wfile.write(html.encode())
 
         elif self.path == '/messages':
-            # 返回消息列表
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -196,12 +450,10 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/send':
-            # 接收新消息
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
             
-            # 添加时间戳
             data['timestamp'] = datetime.now().strftime('%H:%M:%S')
             message_manager.add_message(data)
             
