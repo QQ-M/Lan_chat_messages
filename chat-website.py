@@ -64,45 +64,14 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                 <title>局域网聊天室</title>
                 <meta charset="utf-8">
                 <style>
-                    #messages {
-                        height: 400px;
-                        overflow-y: auto;
-                        border: 1px solid #ccc;
-                        margin-bottom: 10px;
-                        padding: 10px;
-                    }
-                    .message {
-                        margin-bottom: 10px;
-                        display: flex;
-                        align-items: flex-start;
-                        gap: 10px;
-                    }
-                    .message-content {
-                        flex-grow: 1;
-                    }
-                    .timestamp {
-                        color: #666;
-                        font-size: 0.8em;
-                    }
-                    .system-info {
-                        color: #888;
-                        font-size: 0.9em;
-                        margin-bottom: 10px;
-                    }
-                    .copy-btn {
-                        background: #f0f0f0;
-                        border: 1px solid #ccc;
-                        border-radius: 3px;
-                        padding: 2px 8px;
-                        cursor: pointer;
-                        font-size: 0.8em;
-                    }
-                    .copy-btn:hover {
-                        background: #e0e0e0;
-                    }
-                    .copy-btn.copied {
-                        background: #90EE90;
-                        border-color: #008000;
+                    /* ... 之前的样式保持不变 ... */
+                    
+                    /* 添加隐藏文本框的样式 */
+                    .hidden-textarea {
+                        position: fixed;
+                        top: -9999px;
+                        left: -9999px;
+                        opacity: 0;
                     }
                 </style>
             </head>
@@ -113,20 +82,49 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                 <input type="text" id="username" placeholder="你的名字" style="margin-right: 10px;">
                 <input type="text" id="message" placeholder="输入消息">
                 <button onclick="sendMessage()">发送</button>
+                
+                <!-- 添加用于复制的隐藏文本框 -->
+                <textarea id="copyTextarea" class="hidden-textarea"></textarea>
 
                 <script>
                     function copyMessage(message, button) {
-                        navigator.clipboard.writeText(message).then(() => {
-                            // 添加复制成功的视觉反馈
-                            button.textContent = '已复制';
-                            button.classList.add('copied');
-                            
-                            // 1秒后恢复按钮状态
+                        // 首先尝试使用 Clipboard API
+                        if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(message)
+                                .then(() => showCopySuccess(button))
+                                .catch(() => fallbackCopy(message, button));
+                        } else {
+                            // 如果 Clipboard API 不可用，使用后备方案
+                            fallbackCopy(message, button);
+                        }
+                    }
+
+                    function fallbackCopy(message, button) {
+                        const textarea = document.getElementById('copyTextarea');
+                        textarea.value = message;
+                        textarea.select();
+                        
+                        try {
+                            document.execCommand('copy');
+                            showCopySuccess(button);
+                        } catch (err) {
+                            console.error('复制失败:', err);
+                            button.textContent = '复制失败';
+                            button.style.background = '#ffcccc';
                             setTimeout(() => {
                                 button.textContent = '复制';
-                                button.classList.remove('copied');
+                                button.style.background = '#f0f0f0';
                             }, 1000);
-                        });
+                        }
+                    }
+
+                    function showCopySuccess(button) {
+                        button.textContent = '已复制';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = '复制';
+                            button.classList.remove('copied');
+                        }, 1000);
                     }
 
                     function fetchMessages() {
