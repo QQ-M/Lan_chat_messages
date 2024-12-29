@@ -73,6 +73,12 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                     }
                     .message {
                         margin-bottom: 10px;
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 10px;
+                    }
+                    .message-content {
+                        flex-grow: 1;
                     }
                     .timestamp {
                         color: #666;
@@ -82,6 +88,21 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                         color: #888;
                         font-size: 0.9em;
                         margin-bottom: 10px;
+                    }
+                    .copy-btn {
+                        background: #f0f0f0;
+                        border: 1px solid #ccc;
+                        border-radius: 3px;
+                        padding: 2px 8px;
+                        cursor: pointer;
+                        font-size: 0.8em;
+                    }
+                    .copy-btn:hover {
+                        background: #e0e0e0;
+                    }
+                    .copy-btn.copied {
+                        background: #90EE90;
+                        border-color: #008000;
                     }
                 </style>
             </head>
@@ -94,6 +115,20 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                 <button onclick="sendMessage()">发送</button>
 
                 <script>
+                    function copyMessage(message, button) {
+                        navigator.clipboard.writeText(message).then(() => {
+                            // 添加复制成功的视觉反馈
+                            button.textContent = '已复制';
+                            button.classList.add('copied');
+                            
+                            // 1秒后恢复按钮状态
+                            setTimeout(() => {
+                                button.textContent = '复制';
+                                button.classList.remove('copied');
+                            }, 1000);
+                        });
+                    }
+
                     function fetchMessages() {
                         fetch('/messages')
                             .then(response => response.json())
@@ -103,8 +138,11 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                                 data.forEach(msg => {
                                     messagesDiv.innerHTML += `
                                         <div class="message">
-                                            <span class="timestamp">${msg.timestamp}</span>
-                                            <strong>${msg.username}:</strong> ${msg.message}
+                                            <div class="message-content">
+                                                <span class="timestamp">${msg.timestamp}</span>
+                                                <strong>${msg.username}:</strong> ${msg.message}
+                                            </div>
+                                            <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
                                         </div>
                                     `;
                                 });
