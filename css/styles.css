@@ -1,0 +1,245 @@
+:root {
+    --primary-color: #4a90e2;
+    --secondary-color: #f5f5f5;
+    --border-color: #e0e0e0;
+    --success-color: #4caf50;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --background-color: #f9f9f9;
+    --container-background: white;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--background-color);
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: var(--container-background);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px var(--shadow-color);
+    padding: 24px;
+}
+
+h1 {
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 28px;
+}
+
+.system-info {
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 14px;
+    padding: 8px;
+    background: var(--secondary-color);
+    border-radius: 6px;
+}
+
+#messages {
+    height: 500px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--container-background);
+}
+
+.message {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message-content {
+    flex-grow: 1;
+    background: var(--secondary-color);
+    padding: 12px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.timestamp {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.username {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.message-text {
+    word-break: break-word;
+}
+
+.copy-btn {
+    background: var(--container-background);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.copy-btn:hover {
+    background: var(--secondary-color);
+    transform: translateY(-1px);
+}
+
+.copy-btn.copied {
+    background: var(--success-color);
+    color: var(--container-background);
+    border-color: var(--success-color);
+}
+
+.input-area {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+input {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+#username {
+    width: 150px;
+}
+
+#message {
+    flex-grow: 1;
+}
+
+button {
+    background: var(--primary-color);
+    color: var(--container-background);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    background: #357abd;
+    transform: translateY(-1px);
+}
+
+.hidden-textarea {
+    position: fixed;
+    top: -9999px;
+    left: -9999px;
+    opacity: 0;
+}
+
+.message-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.image-upload {
+    display: none;
+}
+
+.image-upload-label {
+    display: inline-block;
+    padding: 6px 12px;
+    cursor: pointer;
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.image-upload-label:hover {
+    background-color: #e0e0e0;
+}
+
+.image-preview {
+    max-width: 100px;
+    max-height: 100px;
+    margin-top: 8px;
+    border-radius: 4px;
+    display: none;
+}
+
+.paste-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    width: 100%;
+    text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        padding: 16px;
+    }
+
+    .input-area {
+        flex-direction: column;
+    }
+
+    #username, #message {
+        width: 100%;
+    }
+
+    .image-upload-label {
+        text-align: center;
+    }
+
+    button {
+        width: 100%;
+    }
+}
+

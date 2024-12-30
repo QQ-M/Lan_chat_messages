@@ -72,6 +72,20 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(message_manager.get_messages()).encode())
 
+        elif self.path.startswith(('/css/', '/js/')):
+            try:
+                file_path = os.path.join(os.getcwd(), self.path[1:])
+                with open(file_path, 'rb') as f:
+                    self.send_response(200)
+                    if self.path.endswith('.css'):
+                        self.send_header('Content-type', 'text/css')
+                    elif self.path.endswith('.js'):
+                        self.send_header('Content-type', 'application/javascript')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            except FileNotFoundError:
+                self.send_error(404, 'File not found')
+
         elif self.path.startswith('/images/'):
             try:
                 image_path = os.path.join(os.getcwd(), self.path[1:])
@@ -105,11 +119,15 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 
                 if image:
+                    # 检查image是否是文件对象
+                    if hasattr(image, 'file'):
+                        image_data = image.file.read()
                     # 检查image是否是base64编码的字符串
-                    if isinstance(image, str) and image.startswith('data:image'):
+                    elif isinstance(image, str) and image.startswith('data:image'):
                         image_data = base64.b64decode(image.split(',')[1])
                     else:
                         image_data = image
+
                     image_filename = f"{uuid.uuid4()}.png"
                     image_path = os.path.join(CONFIG['IMAGE_FOLDER'], image_filename)
                     
