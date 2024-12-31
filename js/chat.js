@@ -2,13 +2,45 @@ let lastPollTime = Date.now();
 const pollInterval = 2000; // 2秒
 
 function copyMessage(message, button) {
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(message)
-            .then(() => showCopySuccess(button))
-            .catch(() => fallbackCopy(message, button));
-    } else {
-        fallbackCopy(message, button);
+    // 创建临时 textarea 元素
+    const textarea = document.createElement('textarea');
+    textarea.value = message;
+    textarea.classList.add('hidden-textarea');
+    document.body.appendChild(textarea);
+    
+    try {
+        // 选择文本
+        textarea.select();
+        textarea.setSelectionRange(0, 99999); // 用于移动设备
+        
+        // 执行复制命令
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showCopySuccess(button);
+        } else {
+            throw new Error('Copy command failed');
+        }
+    } catch (err) {
+        console.error('复制失败:', err);
+        button.textContent = '复制失败';
+        button.style.background = '#ffcccc';
+        setTimeout(() => {
+            button.textContent = '复制';
+            button.style.background = '';
+        }, 1000);
+    } finally {
+        // 清理：移除临时元素
+        document.body.removeChild(textarea);
     }
+}
+
+function showCopySuccess(button) {
+    button.textContent = '已复制';
+    button.classList.add('copied');
+    setTimeout(() => {
+        button.textContent = '复制';
+        button.classList.remove('copied');
+    }, 1000);
 }
 
 function fallbackCopy(message, button) {
@@ -30,107 +62,6 @@ function fallbackCopy(message, button) {
     }
 }
 
-function showCopySuccess(button) {
-    button.textContent = '已复制';
-    button.classList.add('copied');
-    setTimeout(() => {
-        button.textContent = '复制';
-        button.classList.remove('copied');
-    }, 1000);
-}
-
-function createMessageElement(msg) {
-    let imageHtml = '';
-    if (msg.image) {
-        imageHtml = `<img src="${msg.image}" alt="Uploaded image" class="message-image">`;
-    }
-    return `
-        <div class="message">
-            <div class="message-content">
-                <div class="message-header">
-                    <span class="timestamp">${msg.timestamp}</span>
-                    <span class="username">${msg.username}</span>
-                </div>
-                <div class="message-text">${msg.message}</div>
-                ${imageHtml}
-            </div>
-            <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
-        </div>
-    `;
-}
-
-function sendMessage() {
-    const username = document.getElementById('username').value.trim();
-    const message = document.getElementById('message').value.trim();
-    const imageUpload = document.getElementById('image-upload');
-    
-    if (!username || (!message && !imageUpload.files[0])) {
-        alert('请输入用户名和消息或选择图片！');
-        return;
-    }
-
-    const messageInput = document.getElementById('message');
-    messageInput.disabled = true;
-
-    const formData = new FormData();
-    formData.append('username', username);
-    formData.append('message', message);
-
-    if (imageUpload.files[0]) {
-        formData.append('image', imageUpload.files[0]);
-        sendFormData(formData);
-    } else {
-        sendFormData(formData);
-    }
-}
-
-function sendFormData(formData) {
-    fetch('/send', {
-        method: 'POST',
-        body: formData
-    }).then(() => {
-        document.getElementById('message').value = '';
-        document.getElementById('message').disabled = false;
-        document.getElementById('message').focus();
-        document.getElementById('image-upload').value = '';
-        document.getElementById('image-preview').style.display = 'none';
-        fetchMessages();
-    }).catch(() => {
-        document.getElementById('message').disabled = false;
-    });
-}
-
-function fetchMessages() {
-    fetch('/messages')
-        .then(response => response.json())
-        .then(data => {
-            const messagesDiv = document.getElementById('messages');
-            const wasAtBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop <= messagesDiv.clientHeight + 10;
-            
-            // 获取现有消息的数量
-            const existingMessages = messagesDiv.children;
-            const currentLength = existingMessages.length;
-            
-            // 如果消息数量或内容有变化才更新
-            if (currentLength !== data.length || needsUpdate(existingMessages, data)) {
-                // 记住当前滚动位置
-                const oldScrollHeight = messagesDiv.scrollHeight;
-                const oldScrollTop = messagesDiv.scrollTop;
-                
-                // 更新消息
-                messagesDiv.innerHTML = data.map(createMessageElement).join('');
-                
-                // 恢复滚动位置
-                if (wasAtBottom) {
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                } else {
-                    const newScrollHeight = messagesDiv.scrollHeight;
-                    const scrollDiff = newScrollHeight - oldScrollHeight;
-                    messagesDiv.scrollTop = oldScrollTop + scrollDiff;
-                }
-            }
-        });
-}
 
 // 检查消息是否需要更新
 function needsUpdate(existingMessages, newData) {
@@ -207,15 +138,109 @@ function setupPasteListener() {
     });
 }
 
+// 添加自动滚动函数
+function scrollToBottom() {
+    const messagesDiv = document.getElementById('messages');
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function createMessageElement(msg) {
+    let imageHtml = '';
+    if (msg.image) {
+        imageHtml = `<img src="${msg.image}" alt="Uploaded image" class="message-image" onload="scrollToBottom()">`;
+    }
+    return `
+        <div class="message">
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="timestamp">${msg.timestamp}</span>
+                    <span class="username">${msg.username}</span>
+                </div>
+                <div class="message-text">${msg.message}</div>
+                ${imageHtml}
+            </div>
+            <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
+        </div>
+    `;
+}
+
+function fetchMessages() {
+    fetch('/messages')
+        .then(response => response.json())
+        .then(data => {
+            const messagesDiv = document.getElementById('messages');
+            
+            // 获取现有消息的数量
+            const existingMessages = messagesDiv.children;
+            const currentLength = existingMessages.length;
+            
+            // 如果消息数量或内容有变化才更新
+            if (currentLength !== data.length || needsUpdate(existingMessages, data)) {
+                messagesDiv.innerHTML = data.map(createMessageElement).join('');
+                // 自动滚动到底部
+                scrollToBottom();
+            }
+        });
+}
+
+function sendMessage() {
+    const username = document.getElementById('username').value.trim();
+    const message = document.getElementById('message').value.trim();
+    const imageUpload = document.getElementById('image-upload');
+    
+    if (!username || (!message && !imageUpload.files[0])) {
+        alert('请输入用户名和消息或选择图片！');
+        return;
+    }
+
+    const messageInput = document.getElementById('message');
+    messageInput.disabled = true;
+
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('message', message);
+
+    if (imageUpload.files[0]) {
+        formData.append('image', imageUpload.files[0]);
+        sendFormData(formData);
+    } else {
+        sendFormData(formData);
+    }
+}
+
+function sendFormData(formData) {
+    fetch('/send', {
+        method: 'POST',
+        body: formData
+    }).then(() => {
+        document.getElementById('message').value = '';
+        document.getElementById('message').disabled = false;
+        document.getElementById('message').focus();
+        document.getElementById('image-upload').value = '';
+        document.getElementById('image-preview').style.display = 'none';
+        // 发送消息后立即获取并滚动
+        fetchMessages();
+    }).catch(() => {
+        document.getElementById('message').disabled = false;
+    });
+}
+
 // 初始化
 function init() {
-    document.getElementById('max-messages').textContent = 100; // 假设CONFIG.MAX_MESSAGES为100
+    document.getElementById('max-messages').textContent = 100;
     setupImageUpload();
     setupPasteListener();
-    fetchMessages();
-    setInterval(pollMessages, 300); // 使用更短的检查间隔，但实际更新遵循 pollInterval
+    fetchMessages(); // 初始加载消息
+    setInterval(pollMessages, 300);
+    
+    // 添加消息输入框的回车键发送功能
+    document.getElementById('message').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 }
 
 // 当DOM加载完成后初始化
 document.addEventListener('DOMContentLoaded', init);
-
