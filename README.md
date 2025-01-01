@@ -28,12 +28,17 @@
    cd Lan_chat_messages
    ```
 
-3. **运行服务器端**：
+3. **安装依赖**：
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **运行服务器端**：
    ```bash
    python chat-website.py
    ```
 
-4. **使用**：
+5. **使用**：
    ```浏览器
    http://localhost:8000/
    ```

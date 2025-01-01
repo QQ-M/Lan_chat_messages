@@ -1,7 +1,7 @@
 import http.server
 import socketserver
 import json
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 import cgi
 from datetime import datetime
 import os
@@ -9,6 +9,8 @@ import base64
 import uuid
 import mimetypes
 from socketserver import ThreadingMixIn
+import chardet
+import re
 
 # 配置
 CONFIG = {
@@ -59,6 +61,32 @@ class MessageManager:
 
 message_manager = MessageManager()
 
+def sanitize_filename(filename):
+    """Sanitize filename to be URL-safe"""
+    # Remove any non-URL-safe characters
+    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)
+    # Ensure the filename is not empty
+    if not safe_filename:
+        safe_filename = str(uuid.uuid4())
+    return safe_filename
+
+def detect_encoding(file_path):
+    """Detect the encoding of a file"""
+    with open(file_path, 'rb') as file:
+        raw_data = file.read()
+    result = chardet.detect(raw_data)
+    return result['encoding']
+
+def read_file_preview(file_path, num_lines=10):
+    """Read the first num_lines of a file with proper encoding"""
+    encoding = detect_encoding(file_path)
+    try:
+        with open(file_path, 'r', encoding=encoding) as f:
+            preview = ''.join(f.readlines()[:num_lines])
+        return preview
+    except UnicodeDecodeError:
+        return "无法预览文件内容。可能是二进制文件或使用了不支持的编码。"
+
 class ChatHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -90,29 +118,20 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_error(404, 'File not found')
 
-        elif self.path.startswith('/images/'):
-            try:
-                image_path = os.path.join(os.getcwd(), self.path[1:])
-                with open(image_path, 'rb') as f:
-                    self.send_response(200)
-                    self.send_header('Content-type', 'image/png')  # 根据需要调整内容类型
-                    self.end_headers()
-                    self.wfile.write(f.read())
-            except FileNotFoundError:
-                self.send_error(404, 'File not found')
-        elif self.path.startswith('/files/'):
+        elif self.path.startswith(('/images/', '/files/')):
             try:
                 file_path = os.path.join(os.getcwd(), self.path[1:])
                 with open(file_path, 'rb') as f:
                     self.send_response(200)
-                    mime_type, _ = mimetypes.guess_type(file_path)
-                    self.send_header('Content-type', mime_type if mime_type else 'application/octet-stream')
+                    content_type, _ = mimetypes.guess_type(file_path)
+                    self.send_header('Content-type', content_type if content_type else 'application/octet-stream')
                     self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(file_path)}"')
                     self.end_headers()
                     self.wfile.write(f.read())
             except FileNotFoundError:
                 self.send_error(404, 'File not found')
-
+        else:
+            self.send_error(404, 'Not Found')
 
     def do_POST(self):
         if self.path == '/send':
@@ -156,18 +175,26 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                 if 'file' in form:
                     file_item = form['file']
                     if file_item.filename:
-                        file_name = os.path.basename(file_item.filename)
-                        file_path = os.path.join(CONFIG['FILES_FOLDER'], file_name)
+                        original_filename = os.path.basename(file_item.filename)
+                        safe_filename = sanitize_filename(original_filename)
+                        file_path = os.path.join(CONFIG['FILES_FOLDER'], safe_filename)
+                        
+                        # If a file with the same name exists, add a UUID to make it unique
+                        if os.path.exists(file_path):
+                            name, ext = os.path.splitext(safe_filename)
+                            safe_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
+                            file_path = os.path.join(CONFIG['FILES_FOLDER'], safe_filename)
+                        
                         with open(file_path, 'wb') as f:
                             f.write(file_item.file.read())
                         
-                        if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                            data['image'] = f"/files/{file_name}"
+                        if safe_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            data['image'] = f"/files/{quote(safe_filename)}"
                         else:
-                            data['file'] = f"/files/{file_name}"
-                            if file_name.lower().endswith('.txt'):
-                                with open(file_path, 'r') as f:
-                                    preview = ''.join(f.readlines()[:10])
+                            data['file'] = f"/files/{quote(safe_filename)}"
+                            data['original_filename'] = original_filename
+                            if safe_filename.lower().endswith('.txt'):
+                                preview = read_file_preview(file_path)
                                 data['preview'] = preview
 
                 message_manager.add_message(data)

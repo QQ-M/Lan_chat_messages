@@ -124,7 +124,8 @@ function createMessageElement(msg) {
     if (msg.image) {
         attachmentHtml = `<img src="${msg.image}" alt="Uploaded image" class="message-image" onload="scrollToBottom()">`;
     } else if (msg.file) {
-        attachmentHtml = `<a href="${msg.file}" class="file-download" download>下载文件</a>`;
+        const fileName = msg.original_filename || msg.file.split('/').pop();
+        attachmentHtml = `<a href="${msg.file}" class="file-download" download="${fileName}">下载文件: ${fileName}</a>`;
         if (msg.preview) {
             attachmentHtml += `<pre class="file-preview">${msg.preview}</pre>`;
         }
