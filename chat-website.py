@@ -7,17 +7,21 @@ from datetime import datetime
 import os
 import base64
 import uuid
+import mimetypes
+from socketserver import ThreadingMixIn
 
 # 配置
 CONFIG = {
     'MAX_MESSAGES': 100,  # 最大消息数量
     'STORAGE_FILE': 'chat_messages.txt',  # 存储文件名
     'PORT': 8000,  # 服务器端口
-    'IMAGE_FOLDER': 'images'  # 图片存储文件夹
+    'IMAGE_FOLDER': 'images',  # 图片存储文件夹
+    'FILES_FOLDER': 'files' # 文件存储文件夹
 }
 
 # 确保图片存储文件夹存在
 os.makedirs(CONFIG['IMAGE_FOLDER'], exist_ok=True)
+os.makedirs(CONFIG['FILES_FOLDER'], exist_ok=True)
 
 class MessageManager:
     def __init__(self):
@@ -96,6 +100,19 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(f.read())
             except FileNotFoundError:
                 self.send_error(404, 'File not found')
+        elif self.path.startswith('/files/'):
+            try:
+                file_path = os.path.join(os.getcwd(), self.path[1:])
+                with open(file_path, 'rb') as f:
+                    self.send_response(200)
+                    mime_type, _ = mimetypes.guess_type(file_path)
+                    self.send_header('Content-type', mime_type if mime_type else 'application/octet-stream')
+                    self.send_header('Content-Disposition', f'attachment; filename="{os.path.basename(file_path)}"')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            except FileNotFoundError:
+                self.send_error(404, 'File not found')
+
 
     def do_POST(self):
         if self.path == '/send':
@@ -136,6 +153,23 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
                     
                     data['image'] = f"/images/{image_filename}"
                 
+                if 'file' in form:
+                    file_item = form['file']
+                    if file_item.filename:
+                        file_name = os.path.basename(file_item.filename)
+                        file_path = os.path.join(CONFIG['FILES_FOLDER'], file_name)
+                        with open(file_path, 'wb') as f:
+                            f.write(file_item.file.read())
+                        
+                        if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            data['image'] = f"/files/{file_name}"
+                        else:
+                            data['file'] = f"/files/{file_name}"
+                            if file_name.lower().endswith('.txt'):
+                                with open(file_path, 'r') as f:
+                                    preview = ''.join(f.readlines()[:10])
+                                data['preview'] = preview
+
                 message_manager.add_message(data)
                 
                 self.send_response(200)
@@ -145,15 +179,19 @@ class ChatHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(400, 'Bad Request: Expected multipart/form-data')
 
+class ThreadedHTTPServer(ThreadingMixIn, http.server.HTTPServer):
+    """Handle requests in a separate thread."""
+
 def run_server(port=None):
     if port is not None:
         CONFIG['PORT'] = port
     
     handler = ChatHandler
-    with socketserver.TCPServer(("", CONFIG['PORT']), handler) as httpd:
+    with ThreadedHTTPServer(("", CONFIG['PORT']), handler) as httpd:
         print(f"服务器运行在 http://localhost:{CONFIG['PORT']}/")
         print(f"消息将保存在: {os.path.abspath(CONFIG['STORAGE_FILE'])}")
         print(f"图片将保存在: {os.path.abspath(CONFIG['IMAGE_FOLDER'])}")
+        print(f"文件将保存在: {os.path.abspath(CONFIG['FILES_FOLDER'])}")
         print(f"最多保存最近 {CONFIG['MAX_MESSAGES']} 条消息")
         httpd.serve_forever()
 

@@ -96,47 +96,22 @@ function pollMessages() {
     fetchMessages();
 }
 
-// 添加图片预览功能
-function setupImageUpload() {
-    document.getElementById('image-upload').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const preview = document.getElementById('image-preview');
-                preview.src = e.target.result;
-                preview.style.display = 'inline-block';
-            };
-            reader.readAsDataURL(file);
+// 添加文件上传预览功能
+function setupFileUpload() {
+    const fileUpload = document.getElementById('file-upload');
+    fileUpload.addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            handlePastedFile(e.target.files[0]);
         }
     });
 }
 
-// 添加粘贴图片功能
-function setupPasteListener() {
-    document.addEventListener('paste', function(event) {
-        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
-        for (let index in items) {
-            const item = items[index];
-            if (item.kind === 'file') {
-                const blob = item.getAsFile();
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const imagePreview = document.getElementById('image-preview');
-                    imagePreview.src = event.target.result;
-                    imagePreview.style.display = 'inline-block';
-                    
-                    // 创建一个新的 File 对象并将其添加到 image-upload 输入
-                    const imageFile = new File([blob], "pasted-image.png", { type: "image/png" });
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(imageFile);
-                    document.getElementById('image-upload').files = dataTransfer.files;
-                };
-                reader.readAsDataURL(blob);
-            }
-        }
-    });
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+    else return (bytes / 1048576).toFixed(2) + ' MB';
 }
+
 
 // 添加自动滚动函数
 function scrollToBottom() {
@@ -145,9 +120,14 @@ function scrollToBottom() {
 }
 
 function createMessageElement(msg) {
-    let imageHtml = '';
+    let attachmentHtml = '';
     if (msg.image) {
-        imageHtml = `<img src="${msg.image}" alt="Uploaded image" class="message-image" onload="scrollToBottom()">`;
+        attachmentHtml = `<img src="${msg.image}" alt="Uploaded image" class="message-image" onload="scrollToBottom()">`;
+    } else if (msg.file) {
+        attachmentHtml = `<a href="${msg.file}" class="file-download" download>下载文件</a>`;
+        if (msg.preview) {
+            attachmentHtml += `<pre class="file-preview">${msg.preview}</pre>`;
+        }
     }
     return `
         <div class="message">
@@ -157,7 +137,7 @@ function createMessageElement(msg) {
                     <span class="username">${msg.username}</span>
                 </div>
                 <div class="message-text">${msg.message}</div>
-                ${imageHtml}
+                ${attachmentHtml}
             </div>
             <button class="copy-btn" onclick="copyMessage('${msg.message.replace(/'/g, "\\'")}', this)">复制</button>
         </div>
@@ -186,49 +166,61 @@ function fetchMessages() {
 function sendMessage() {
     const username = document.getElementById('username').value.trim();
     const message = document.getElementById('message').value.trim();
-    const imageUpload = document.getElementById('image-upload');
+    const fileUpload = document.getElementById('file-upload');
     
-    if (!username || (!message && !imageUpload.files[0])) {
-        alert('请输入用户名和消息或选择图片！');
+    if (!username || (!message && !fileUpload.files[0])) {
+        alert('请输入用户名和消息或选择文件！');
         return;
     }
-
-    const messageInput = document.getElementById('message');
-    messageInput.disabled = true;
 
     const formData = new FormData();
     formData.append('username', username);
     formData.append('message', message);
 
-    if (imageUpload.files[0]) {
-        formData.append('image', imageUpload.files[0]);
-        sendFormData(formData);
-    } else {
-        sendFormData(formData);
+    if (fileUpload.files[0]) {
+        formData.append('file', fileUpload.files[0]);
     }
+
+    sendFormData(formData);
 }
 
 function sendFormData(formData) {
-    fetch('/send', {
-        method: 'POST',
-        body: formData
-    }).then(() => {
-        document.getElementById('message').value = '';
-        document.getElementById('message').disabled = false;
-        document.getElementById('message').focus();
-        document.getElementById('image-upload').value = '';
-        document.getElementById('image-preview').style.display = 'none';
-        // 发送消息后立即获取并滚动
-        fetchMessages();
-    }).catch(() => {
-        document.getElementById('message').disabled = false;
-    });
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/send', true);
+
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            updateProgressBar(percentComplete);
+        }
+    };
+
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            document.getElementById('message').value = '';
+            document.getElementById('file-upload').value = '';
+            document.getElementById('file-preview').innerHTML = '';
+            fetchMessages();
+        }
+    };
+
+    xhr.send(formData);
+}
+
+function updateProgressBar(percent) {
+    const progressBar = document.getElementById('upload-progress');
+    progressBar.style.width = percent + '%';
+    if (percent === 100) {
+        setTimeout(() => {
+            progressBar.style.width = '0%';
+        }, 1000);
+    }
 }
 
 // 初始化
 function init() {
     document.getElementById('max-messages').textContent = 100;
-    setupImageUpload();
+    setupFileUpload();
     setupPasteListener();
     fetchMessages(); // 初始加载消息
     setInterval(pollMessages, 300);
@@ -242,5 +234,44 @@ function init() {
     });
 }
 
+function setupPasteListener() {
+    document.addEventListener('paste', function(event) {
+        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+        for (let index in items) {
+            const item = items[index];
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                handlePastedFile(file);
+            }
+        }
+    });
+}
+
+function handlePastedFile(file) {
+    const fileUpload = document.getElementById('file-upload');
+    const filePreview = document.getElementById('file-preview');
+    
+    // Create a new File object with a unique name
+    const uniqueFileName = `pasted-file-${Date.now()}-${file.name}`;
+    const newFile = new File([file], uniqueFileName, { type: file.type });
+    
+    // Update the file input
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(newFile);
+    fileUpload.files = dataTransfer.files;
+    
+    // Show preview
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            filePreview.innerHTML = `<img src="${e.target.result}" alt="File preview" class="file-preview-image">`;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        filePreview.innerHTML = `<div class="file-preview-info">${newFile.name} (${formatFileSize(newFile.size)})</div>`;
+    }
+}
+
 // 当DOM加载完成后初始化
 document.addEventListener('DOMContentLoaded', init);
+

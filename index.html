@@ -15,9 +15,9 @@
         <div class="input-area">
             <input type="text" id="username" placeholder="你的名字" autocomplete="off">
             <input type="text" id="message" placeholder="输入消息" autocomplete="off">
-            <label for="image-upload" class="image-upload-label">添加图片</label>
-            <input type="file" id="image-upload" class="image-upload" accept="image/*">
-            <img id="image-preview" class="image-preview" alt="Image preview">
+            <input type="file" id="file-upload" class="file-upload" accept="*/*">
+            <label for="file-upload" class="file-upload-label">添加文件</label>
+            <div id="file-preview" class="file-preview"></div>
             <button onclick="sendMessage()">发送</button>
             <div class="paste-info">你也可以直接粘贴图片</div>
         </div>
