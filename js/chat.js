@@ -179,7 +179,11 @@ function sendMessage() {
     formData.append('message', message);
 
     if (fileUpload.files[0]) {
-        formData.append('file', fileUpload.files[0]);
+        if (fileUpload.files[0].type.startsWith('image/')) {
+            formData.append('image', fileUpload.dataset.base64Image);
+        } else {
+            formData.append('file', fileUpload.files[0]);
+        }
     }
 
     sendFormData(formData);
@@ -261,18 +265,21 @@ function handlePastedFile(file) {
     dataTransfer.items.add(newFile);
     fileUpload.files = dataTransfer.files;
     
-    // Show preview
+    // Show preview and handle image upload
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = function(e) {
             filePreview.innerHTML = `<img src="${e.target.result}" alt="File preview" class="file-preview-image">`;
+            // Store the base64 string in a data attribute
+            fileUpload.dataset.base64Image = e.target.result;
         };
         reader.readAsDataURL(file);
     } else {
         filePreview.innerHTML = `<div class="file-preview-info">${newFile.name} (${formatFileSize(newFile.size)})</div>`;
+        // Clear the base64 string if it's not an image
+        delete fileUpload.dataset.base64Image;
     }
 }
 
 // 当DOM加载完成后初始化
 document.addEventListener('DOMContentLoaded', init);
-
