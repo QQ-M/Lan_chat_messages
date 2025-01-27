@@ -192,11 +192,14 @@ function sendMessage() {
 function sendFormData(formData) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/send', true);
+    const progressBar = document.getElementById('progress-bar');
+    const progressContainer = document.getElementById('progress-container');
+    progressContainer.style.display = 'block';
 
     xhr.upload.onprogress = function(e) {
         if (e.lengthComputable) {
             const percentComplete = (e.loaded / e.total) * 100;
-            updateProgressBar(percentComplete);
+            progressBar.style.width = percentComplete + '%';
         }
     };
 
@@ -205,6 +208,8 @@ function sendFormData(formData) {
             document.getElementById('message').value = '';
             document.getElementById('file-upload').value = '';
             document.getElementById('file-preview').innerHTML = '';
+            progressBar.style.width = '0%';
+            progressContainer.style.display = 'none';
             fetchMessages();
         }
     };
